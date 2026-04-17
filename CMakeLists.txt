@@ -46,6 +46,8 @@ include_directories(${stb_image_SOURCE_DIR})
 set(EXERCISES
     Hello3D
     HelloCamera
+    HelloOBJ
+    HelloPhong
     # TrabalhoGrauA
 )
 
