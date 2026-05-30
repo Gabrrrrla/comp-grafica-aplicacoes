@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(CGCC)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -48,14 +49,14 @@ include_directories(${glm_SOURCE_DIR})
 include_directories(${stb_image_SOURCE_DIR})
 
 set(EXERCISES
-    ExAlien_Gabi
+    # ExAlien_Gabi
     ExCubeMap_Gabi
     Hello3D
     HelloCamera
     HelloCubemap
     HelloCurves
     HelloOBJ_Gabi
-    HelloPhong
+    HelloPhong  
     TrabalhoGA_Gabi_Luisa 
 )
 
