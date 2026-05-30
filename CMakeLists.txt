@@ -48,8 +48,12 @@ include_directories(${glm_SOURCE_DIR})
 include_directories(${stb_image_SOURCE_DIR})
 
 set(EXERCISES
+    ExAlien_Gabi
+    ExCubeMap_Gabi
     Hello3D
     HelloCamera
+    HelloCubemap
+    HelloCurves
     HelloOBJ_Gabi
     HelloPhong
     TrabalhoGA_Gabi_Luisa 
