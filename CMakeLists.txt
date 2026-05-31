@@ -17,7 +17,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   glm
   GIT_REPOSITORY https://github.com/g-truc/glm.git
-  GIT_TAG master 
+  GIT_TAG 1.0.1
 )
 
 # Faz o download e compila as bibliotecas
@@ -34,6 +34,7 @@ set(ASSIMP_BUILD_TESTS OFF CACHE INTERNAL "")
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE INTERNAL "")
 set(ASSIMP_INSTALL OFF CACHE INTERNAL "")
 set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "") # Força compilação estática
+set(ASSIMP_BUILD_ZLIB OFF CACHE INTERNAL "") # Evita erro de compilação do zlib no macOS
 
 FetchContent_Declare(
   assimp
@@ -58,6 +59,7 @@ set(EXERCISES
     HelloOBJ_Gabi
     HelloPhong  
     TrabalhoGA_Gabi_Luisa 
+    TrabalhoGB_Gabi_Luisa
 )
 
 add_compile_options(-Wno-pragmas)

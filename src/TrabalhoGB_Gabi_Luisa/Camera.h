@@ -26,7 +26,7 @@ public:
     // Construtor com valores padrão (apontando para a origem)
     Camera(glm::vec3 startPos = glm::vec3(0.0f, 0.0f, -3.0f), 
            glm::vec3 startUp = glm::vec3(0.0f, 1.0f, 0.0f), 
-           float startYaw = 90.0f, 
+           float startYaw = -90.0f,
            float startPitch = 0.0f);
 
     // Retorna a matriz de View calculada

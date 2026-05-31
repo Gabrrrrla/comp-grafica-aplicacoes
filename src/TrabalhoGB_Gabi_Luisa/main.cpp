@@ -1,440 +1,319 @@
 // Alunas: Gabriela Bley e Luisa Becker
-// Processamento Gráfico: Aplicações
-// Prof. Rossana Queiroz
+// Processamento Grafico: Aplicacoes
+// Trabalho GB - Visualizador 3D
 
 #include <iostream>
-#include <string>
-#include <vector>
 
-// GLAD (Sempre inclua antes do GLFW)
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// GLM
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Assimp
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-
-// Câmera
 #include "Camera.h"
+#include "Model.h"
 
-using namespace std;
+const unsigned int WIDTH = 1024;
+const unsigned int HEIGHT = 768;
 
-// Protótipos das funções
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void framebufferSizeCallback(GLFWwindow* window, int width, int height);
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void mouseCallback(GLFWwindow* window, double xpos, double ypos);
+void processInput(GLFWwindow* window);
 GLuint setupShaders();
-void drawGrid(GLuint shaderProgram);
+GLuint compileShader(GLenum type, const char* source);
 
-// Dimensões da janela
-const GLuint WIDTH = 1024, HEIGHT = 768;
-
-// Shaders com iluminação de Phong
-const GLchar* vertexShaderSource = R"glsl(#version 450
+const char* vertexShaderSource = R"glsl(
+#version 410 core
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
-layout (location = 2) in vec2 texCoords; // Recuperado via Assimp, pronto para o futuro
+layout (location = 2) in vec2 texCoords;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat3 normalMatrix;
 
 out vec3 FragPos;
 out vec3 Normal;
+out vec2 TexCoords;
 
 void main() {
-    FragPos = vec3(model * vec4(position, 1.0));
-    Normal = mat3(transpose(inverse(model))) * normal;  
-    gl_Position = projection * view * vec4(FragPos, 1.0);
+    vec4 worldPosition = model * vec4(position, 1.0);
+    FragPos = worldPosition.xyz;
+    Normal = normalize(normalMatrix * normal);
+    TexCoords = texCoords;
+    gl_Position = projection * view * worldPosition;
 }
 )glsl";
 
-const GLchar* fragmentShaderSource = R"glsl(#version 450
+const char* fragmentShaderSource = R"glsl(
+#version 410 core
 in vec3 FragPos;
 in vec3 Normal;
+in vec2 TexCoords;
+
 out vec4 color;
 
-uniform vec3 lightPos; 
-uniform vec3 viewPos; 
+uniform vec3 materialKa;
+uniform vec3 materialKd;
+uniform vec3 materialKs;
+uniform float materialShininess;
+uniform sampler2D diffuseTexture;
+uniform bool useDiffuseTexture;
 
-uniform vec3 material_ka;
-uniform vec3 material_kd;
-uniform vec3 material_ks;
-uniform float material_shininess;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform float lightIntensity;
+uniform float ambientIntensity;
+uniform vec3 viewPos;
+uniform bool selected;
 
 void main() {
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    vec3 ambient = material_ka * lightColor;
-    
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = material_kd * diff * lightColor;
-    
     vec3 viewDir = normalize(viewPos - FragPos);
-    vec3 reflectDir = reflect(-lightDir, norm);  
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material_shininess);
-    vec3 specular = material_ks * spec * lightColor;  
-        
-    color = vec4(ambient + diffuse + specular, 1.0);
+    vec3 reflectDir = reflect(-lightDir, norm);
+
+    vec3 textureColor = useDiffuseTexture ? texture(diffuseTexture, TexCoords).rgb : vec3(1.0);
+    vec3 diffuseMaterial = materialKd * textureColor;
+
+    vec3 ambient = ambientIntensity * materialKa * lightColor;
+
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * diffuseMaterial * lightColor * lightIntensity;
+
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), materialShininess);
+    vec3 specular = spec * materialKs * lightColor * lightIntensity;
+
+    vec3 result = ambient + diffuse + specular;
+    if (selected) {
+        result = mix(result, vec3(1.0, 0.78, 0.25), 0.25);
+    }
+
+    color = vec4(result, 1.0);
 }
 )glsl";
 
-// Shader simples só para desenhar as linhas do grid
-const GLchar* gridVertexShader = R"glsl(#version 450
-layout (location = 0) in vec3 position;
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * view * model * vec4(position, 1.0);
-}
-)glsl";
-
-const GLchar* gridFragmentShader = R"glsl(#version 450
-out vec4 color;
-void main() {
-    color = vec4(0.5, 0.5, 0.5, 1.0); // Cinza
-}
-)glsl";
-
-bool perspective = true; 
+bool perspectiveProjection = true;
 bool wireframe = false;
-Camera camera(glm::vec3(0.0f, 2.0f, 6.0f)); 
-float deltaTime = 0.0f;
-float lastFrame = 0.0f; 
+int selectedObject = 0;
 
-// Mouse FPS
-float lastX = WIDTH / 2.0f;
-float lastY = HEIGHT / 2.0f;
+Camera camera(glm::vec3(0.0f, 1.6f, 6.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, -10.0f);
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
+
+float lastX = WIDTH * 0.5f;
+float lastY = HEIGHT * 0.5f;
 bool firstMouse = true;
 
-struct Vertex {
-    glm::vec3 Position;
-    glm::vec3 Normal;
-    glm::vec2 TexCoords;
-};
-
-class Mesh {
-public:
-    // Transformações
-    glm::vec3 position;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-
-    // Materiais
-    glm::vec3 ka, kd, ks;
-    float shininess;
-
-    Mesh(std::string path) : position(0.0f), rotation(0.0f), scale(1.0f),
-                             ka(0.1f), kd(0.8f), ks(0.5f), shininess(32.0f) {
-        loadModel(path);
-    }
-
-    void Draw(GLuint shaderID) {
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, position);
-        model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, scale);
-
-        glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        
-        glUniform3fv(glGetUniformLocation(shaderID, "material_ka"), 1, glm::value_ptr(ka));
-        glUniform3fv(glGetUniformLocation(shaderID, "material_kd"), 1, glm::value_ptr(kd));
-        glUniform3fv(glGetUniformLocation(shaderID, "material_ks"), 1, glm::value_ptr(ks));
-        glUniform1f(glGetUniformLocation(shaderID, "material_shininess"), shininess);
-
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-    }
-
-private:
-    GLuint VAO, VBO, EBO;
-    std::vector<Vertex> vertices;
-    std::vector<unsigned int> indices;
-
-    void loadModel(std::string path) {
-        Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs);
-
-        if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            std::cout << "ERRO ASSIMP: " << importer.GetErrorString() << std::endl;
-            return;
-        }
-        processNode(scene->mRootNode, scene);
-        setupMesh();
-    }
-
-    void processNode(aiNode *node, const aiScene *scene) {
-        for(unsigned int i = 0; i < node->mNumMeshes; i++) {
-            aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-            processMesh(mesh, scene);
-        }
-        for(unsigned int i = 0; i < node->mNumChildren; i++) {
-            processNode(node->mChildren[i], scene);
-        }
-    }
-
-    void processMesh(aiMesh *mesh, const aiScene *scene) {
-        for(unsigned int i = 0; i < mesh->mNumVertices; i++) {
-            Vertex vertex;
-            vertex.Position = glm::vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
-            if (mesh->HasNormals()) {
-                vertex.Normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
-            }
-            if(mesh->mTextureCoords[0]) {
-                vertex.TexCoords = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
-            } else {
-                vertex.TexCoords = glm::vec2(0.0f, 0.0f);
-            }
-            vertices.push_back(vertex);
-        }
-        for(unsigned int i = 0; i < mesh->mNumFaces; i++) {
-            aiFace face = mesh->mFaces[i];
-            for(unsigned int j = 0; j < face.mNumIndices; j++)
-                indices.push_back(face.mIndices[j]);
-        }
-    }
-
-    void setupMesh() {
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        glGenBuffers(1, &EBO);
-
-        glBindVertexArray(VAO);
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
-
-        glBindVertexArray(0);
-    }
-};
-
-std::vector<Mesh> sceneObjects;
-int selectedObjectIndex = 0; 
-glm::vec3 pointLightPos(0.0f, 5.0f, 2.0f); 
-
 int main() {
-    glfwInit();
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Trabalho GA - Gabriela e Luisa", nullptr, nullptr);
+    if (!glfwInit()) {
+        std::cerr << "Falha ao inicializar GLFW" << std::endl;
+        return -1;
+    }
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+
+    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Trabalho GB - Visualizador", nullptr, nullptr);
+    if (!window) {
+        std::cerr << "Falha ao criar janela GLFW" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
     glfwMakeContextCurrent(window);
-    
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+    glfwSetKeyCallback(window, keyCallback);
+    glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cout << "Falha ao inicializar GLAD" << std::endl;
+    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+        std::cerr << "Falha ao inicializar GLAD" << std::endl;
+        glfwTerminate();
         return -1;
     }
 
     glEnable(GL_DEPTH_TEST);
 
-    // Compila os shaders principais
     GLuint shaderID = setupShaders();
-    
-    // Compila o Shader do Grid (simples)
-    GLuint gridVShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(gridVShader, 1, &gridVertexShader, NULL);
-    glCompileShader(gridVShader);
-    GLuint gridFShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(gridFShader, 1, &gridFragmentShader, NULL);
-    glCompileShader(gridFShader);
-    GLuint gridShaderID = glCreateProgram();
-    glAttachShader(gridShaderID, gridVShader);
-    glAttachShader(gridShaderID, gridFShader);
-    glLinkProgram(gridShaderID);
-
-    Mesh suzanne("../assets/Modelos3D/SuzanneSubdiv1.obj");
-    suzanne.position = glm::vec3(-2.0f, 1.0f, 0.0f); 
-    suzanne.kd = glm::vec3(1.0f, 0.5f, 0.31f); // Laranja
-
-    Mesh cube("../assets/Modelos3D/Cube.obj");
-    cube.position = glm::vec3(2.0f, 1.0f, 0.0f); 
-    cube.kd = glm::vec3(0.2f, 0.6f, 0.8f); // Azul
-
-    sceneObjects.push_back(suzanne);
-    sceneObjects.push_back(cube);
-
-    while (!glfwWindowShouldClose(window)) {
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
-        glfwPollEvents();
-
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        if(wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-        // Matrizes base
-        glm::mat4 projection = perspective ? 
-            glm::perspective(glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 100.0f) :
-            glm::ortho(-6.0f, 6.0f, -4.5f, 4.5f, 0.1f, 100.0f);
-        
-        // Câmera WASD
-        if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.processKeyboard("FORWARD", deltaTime);
-        if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camera.processKeyboard("BACKWARD", deltaTime);
-        if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.processKeyboard("LEFT", deltaTime);
-        if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.processKeyboard("RIGHT", deltaTime);
-        glm::mat4 view = camera.getViewMatrix();
-
-        if (!sceneObjects.empty()) {
-            Mesh& selectedObj = sceneObjects[selectedObjectIndex];
-            float moveSpeed = 3.0f * deltaTime;
-            float rotSpeed = 90.0f * deltaTime; 
-            float scaleSpeed = 1.0f * deltaTime;
-
-            // Translação (Setas + I/K)
-            if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) selectedObj.position.y += moveSpeed;
-            if(glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) selectedObj.position.y -= moveSpeed;
-            if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) selectedObj.position.x += moveSpeed;
-            if(glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) selectedObj.position.x -= moveSpeed;
-            if(glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) selectedObj.position.z -= moveSpeed;
-            if(glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) selectedObj.position.z += moveSpeed;
-
-            // Rotação (R + Eixo)
-            if(glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
-                if(glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) selectedObj.rotation.x += rotSpeed;
-                if(glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS) selectedObj.rotation.y += rotSpeed;
-                if(glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) selectedObj.rotation.z += rotSpeed;
-            }
-
-            // Escala (+ e -)
-            if(glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS) selectedObj.scale += glm::vec3(scaleSpeed);
-            if(glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS) {
-                selectedObj.scale -= glm::vec3(scaleSpeed);
-                if (selectedObj.scale.x < 0.1f) selectedObj.scale = glm::vec3(0.1f);
-            }
-        }
-
-        // Renderiza o grid
-        glUseProgram(gridShaderID);
-        glUniformMatrix4fv(glGetUniformLocation(gridShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(gridShaderID, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        drawGrid(gridShaderID);
-
-        // Renderiza os objetos (phong)
-        glUseProgram(shaderID);
-        glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        glUniform3fv(glGetUniformLocation(shaderID, "lightPos"), 1, glm::value_ptr(pointLightPos));
-        glUniform3fv(glGetUniformLocation(shaderID, "viewPos"), 1, glm::value_ptr(camera.position));
-
-        for (int i = 0; i < sceneObjects.size(); i++) {
-            sceneObjects[i].Draw(shaderID);
-        }
-        
-        glfwSwapBuffers(window);
+    if (shaderID == 0) {
+        glfwTerminate();
+        return -1;
     }
 
+    {
+        Model suzanne;
+        Model cube;
+
+        suzanne.loadFromFile("../assets/Modelos3D/SuzanneSubdiv1.obj");
+        cube.loadFromFile("../assets/Modelos3D/Cube.obj");
+
+        Transform3D suzanneTransform;
+        suzanneTransform.position = glm::vec3(-1.35f, 0.0f, 0.0f);
+        suzanneTransform.rotation = glm::vec3(0.0f, 25.0f, 0.0f);
+        suzanneTransform.scale = glm::vec3(1.0f);
+
+        Transform3D cubeTransform;
+        cubeTransform.position = glm::vec3(1.55f, 0.0f, 0.0f);
+        cubeTransform.rotation = glm::vec3(0.0f, -20.0f, 0.0f);
+        cubeTransform.scale = glm::vec3(1.0f);
+
+        glm::vec3 lightPos(2.5f, 4.0f, 3.0f);
+        glm::vec3 lightColor(1.0f, 0.96f, 0.88f);
+
+        while (!glfwWindowShouldClose(window)) {
+            const float currentFrame = static_cast<float>(glfwGetTime());
+            deltaTime = currentFrame - lastFrame;
+            lastFrame = currentFrame;
+
+            processInput(window);
+
+            glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
+            glClearColor(0.08f, 0.09f, 0.11f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            int framebufferWidth = WIDTH;
+            int framebufferHeight = HEIGHT;
+            glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+            const float aspect = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+
+            glm::mat4 view = camera.getViewMatrix();
+            glm::mat4 projection;
+            if (perspectiveProjection) {
+                projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+            } else {
+                projection = glm::ortho(-4.0f * aspect, 4.0f * aspect, -4.0f, 4.0f, 0.1f, 100.0f);
+            }
+
+            glUseProgram(shaderID);
+            glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+            glUniform3fv(glGetUniformLocation(shaderID, "lightPos"), 1, glm::value_ptr(lightPos));
+            glUniform3fv(glGetUniformLocation(shaderID, "lightColor"), 1, glm::value_ptr(lightColor));
+            glUniform1f(glGetUniformLocation(shaderID, "lightIntensity"), 1.0f);
+            glUniform1f(glGetUniformLocation(shaderID, "ambientIntensity"), 0.25f);
+            glUniform3fv(glGetUniformLocation(shaderID, "viewPos"), 1, glm::value_ptr(camera.position));
+
+            suzanne.draw(shaderID, suzanneTransform, selectedObject == 0);
+            cube.draw(shaderID, cubeTransform, selectedObject == 1);
+
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+        }
+    }
+
+    glDeleteProgram(shaderID);
     glfwTerminate();
     return 0;
 }
 
-// Funções auxiliares
-
-void drawGrid(GLuint shaderProgram) {
-    std::vector<glm::vec3> gridVertices;
-    int size = 15;
-    for (int i = -size; i <= size; i++) {
-        gridVertices.push_back(glm::vec3(i, 0, -size));
-        gridVertices.push_back(glm::vec3(i, 0, size));
-        gridVertices.push_back(glm::vec3(-size, 0, i));
-        gridVertices.push_back(glm::vec3(size, 0, i));
-    }
-
-    GLuint gridVAO, gridVBO;
-    glGenVertexArrays(1, &gridVAO);
-    glGenBuffers(1, &gridVBO);
-    glBindVertexArray(gridVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, gridVBO);
-    glBufferData(GL_ARRAY_BUFFER, gridVertices.size() * sizeof(glm::vec3), &gridVertices[0], GL_STATIC_DRAW);
-    
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-    
-    glm::mat4 model = glm::mat4(1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-    
-    glDrawArrays(GL_LINES, 0, gridVertices.size());
-    
-    glDeleteBuffers(1, &gridVBO);
-    glDeleteVertexArrays(1, &gridVAO);
+void framebufferSizeCallback(GLFWwindow*, int width, int height) {
+    glViewport(0, 0, width, height);
 }
 
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
+void keyCallback(GLFWwindow* window, int key, int, int action, int) {
+    if (action != GLFW_PRESS) {
+        return;
+    }
 
+    if (key == GLFW_KEY_ESCAPE) {
+        glfwSetWindowShouldClose(window, true);
+    } else if (key == GLFW_KEY_P) {
+        perspectiveProjection = !perspectiveProjection;
+    } else if (key == GLFW_KEY_M) {
+        wireframe = !wireframe;
+    } else if (key == GLFW_KEY_1) {
+        selectedObject = 0;
+    } else if (key == GLFW_KEY_2) {
+        selectedObject = 1;
+    }
+}
+
+void mouseCallback(GLFWwindow*, double xpos, double ypos) {
     if (firstMouse) {
-        lastX = xpos;
-        lastY = ypos;
+        lastX = static_cast<float>(xpos);
+        lastY = static_cast<float>(ypos);
         firstMouse = false;
     }
 
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; 
-    lastX = xpos;
-    lastY = ypos;
+    const float xoffset = static_cast<float>(xpos) - lastX;
+    const float yoffset = lastY - static_cast<float>(ypos);
+
+    lastX = static_cast<float>(xpos);
+    lastY = static_cast<float>(ypos);
 
     camera.processMouseMovement(xoffset, yoffset);
 }
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
-
-    if (key == GLFW_KEY_P && action == GLFW_PRESS)
-        perspective = !perspective;
-        
-    if (key == GLFW_KEY_M && action == GLFW_PRESS)
-        wireframe = !wireframe;
-
-    if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        if (!sceneObjects.empty()) {
-            selectedObjectIndex = (selectedObjectIndex + 1) % sceneObjects.size();
-            std::cout << "Objeto selecionado: " << selectedObjectIndex << std::endl;
-        }
+void processInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.processKeyboard("FORWARD", deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.processKeyboard("BACKWARD", deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.processKeyboard("LEFT", deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.processKeyboard("RIGHT", deltaTime);
     }
 }
 
 GLuint setupShaders() {
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+
+    if (vertexShader == 0 || fragmentShader == 0) {
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        return 0;
+    }
+
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
-    
+
+    GLint success = 0;
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[1024];
+        glGetProgramInfoLog(shaderProgram, 1024, nullptr, infoLog);
+        std::cerr << "Erro ao linkar shader program:\n" << infoLog << std::endl;
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        glDeleteProgram(shaderProgram);
+        return 0;
+    }
+
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
     return shaderProgram;
+}
+
+GLuint compileShader(GLenum type, const char* source) {
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+
+    GLint success = 0;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[1024];
+        glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
+        std::cerr << "Erro ao compilar shader:\n" << infoLog << std::endl;
+        glDeleteShader(shader);
+        return 0;
+    }
+
+    return shader;
 }
