@@ -29,8 +29,9 @@ using namespace std;
 // Camera
 #include "Camera.h"
 
-// Protótipo da função de callback de teclado
+// Protótipo da funções de callback
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mode);
 
 // Protótipos das funções
 int setupShader();
@@ -69,6 +70,9 @@ bool perspective = true; //começa com projeção perspectiva
 float deltaTime = 0.0;
 float lastFrame = 0.0; 
 
+// Para uso do picking
+glm::mat4 view, projection;
+
 struct Mesh 
 {
     GLuint VAO; 
@@ -81,14 +85,16 @@ class Curve
 	public:
 	vector <glm::vec3> controlPoints;
 	vector <glm::vec3> curvePoints;
-	GLuint VAO_controlPoints, VAO_curvePoints; 
+	GLuint VAO_controlPoints, VAO_curvePoints, VBO_controlPoints, VBO_curvePoints;
+	
+	Curve(): VAO_controlPoints(0), VBO_controlPoints(0), VAO_curvePoints(0), VBO_curvePoints(0) {}
 	void setupCurveBuffers();
 	void generateCurve();
 	void drawCurve(GLuint &shader);
-
-
-
 };
+
+// Deixando a curva global
+Curve curva;
 
 // Função MAIN
 int main()
@@ -115,6 +121,7 @@ int main()
 
 	// Fazendo o registro da função de callback para a janela GLFW
 	glfwSetKeyCallback(window, key_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 	// GLAD: carrega todos os ponteiros d funções da OpenGL
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -138,14 +145,11 @@ int main()
 	// Compilando e buildando o programa de shader
 	GLuint shaderID = setupShader();
 
-	Curve curva;
-	curva.controlPoints.push_back(glm::vec3(-1.0,-1.0,0.0));
-	curva.controlPoints.push_back(glm::vec3( 1.0, 1.0,0.0));
-	curva.controlPoints.push_back(glm::vec3(-1.0, 1.0,0.0));
-	curva.controlPoints.push_back(glm::vec3( 1.0, -1.0,0.0));
-	curva.setupCurveBuffers();
-
-
+	//curva.controlPoints.push_back(glm::vec3(-1.0,-1.0,0.0));
+	//curva.controlPoints.push_back(glm::vec3( 1.0, 1.0,0.0));
+	//curva.controlPoints.push_back(glm::vec3(-1.0, 1.0,0.0));
+	//curva.controlPoints.push_back(glm::vec3( 1.0, -1.0,0.0));
+	
 	glUseProgram(shaderID);
 
     // Matriz de modelo - Transformações nos objetos
@@ -154,7 +158,7 @@ int main()
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, glm::value_ptr(model));
     //-----------------
     // Matriz de projeção
-    glm::mat4 projection = glm::ortho(-3.0, 3.0, -3.0, 3.0, 0.1, 100.0);
+    projection = glm::ortho(-3.0, 3.0, -3.0, 3.0, 0.1, 100.0);
     glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 	
     //glm::mat4 projection = glm::perspective(glm::radians(45.0f),(float)WIDTH/(float)HEIGHT,0.1f,100.0f);
@@ -162,7 +166,7 @@ int main()
 	
     
     // Matriz de view
-    glm::mat4 view = glm::lookAt(glm::vec3(0,0,3), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    view = glm::lookAt(glm::vec3(0,0,3), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(view));
     
     glEnable(GL_DEPTH_TEST);
@@ -236,10 +240,20 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		rotateZ = true;
 	}
 
-    if (key == GLFW_KEY_P && action == GLFW_PRESS)
-         {
-            perspective = !perspective;
-         }
+	if (key == GLFW_KEY_ENTER && action == GLFW_PRESS)
+    {
+        if (!curva.controlPoints.empty()) 
+        {
+            std::cout << "Enviando " << curva.controlPoints.size() 
+                      << " pontos de controle para a GPU..." << std::endl;
+            
+            // Agora sim atualizamos o VBO/VAO
+            curva.setupCurveBuffers();
+            
+            // Futuramente, é aqui que você também chamaria o método
+            // curva.generateCurve() para calcular os pontos interpolados!
+        }
+	}
 
 
 
@@ -481,35 +495,87 @@ int loadSimpleOBJ(string filePATH, int &nVertices)
 
 void Curve::setupCurveBuffers()
 {
-	cout << controlPoints.size() << endl;
-	GLuint VBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, controlPoints.size() * sizeof(GLfloat)*3, controlPoints.data(), GL_STATIC_DRAW);
+    // 1. Liberação de memória da GPU
+    if (VAO_controlPoints != 0) {
+        glDeleteVertexArrays(1, &VAO_controlPoints);
+        VAO_controlPoints = 0;
+    }
+    if (VBO_controlPoints != 0) {
+        glDeleteBuffers(1, &VBO_controlPoints);
+        VBO_controlPoints = 0;
+    }
+
+    // 2. Prevenção de quebra: se o vetor estiver vazio, não criamos buffers
+    if (controlPoints.empty()) {
+        return;
+    }
+
+    cout << "Pontos atuais: " << controlPoints.size() << endl;
+	
+    // 3. Recriação dos buffers
+    glGenBuffers(1, &VBO_controlPoints);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_controlPoints);
+    glBufferData(GL_ARRAY_BUFFER, controlPoints.size() * sizeof(GLfloat) * 3, controlPoints.data(), GL_STATIC_DRAW);
     
     glGenVertexArrays(1, &VAO_controlPoints);
     glBindVertexArray(VAO_controlPoints);
     
-	// Atributo: coordenada do vértice (x,y,z) - 3 valores
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
     glEnableVertexAttribArray(0);
     
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-
 }
 
 void Curve::drawCurve(GLuint &shader)
 {
-	glBindVertexArray(VAO_controlPoints);
-	//Cor dos pontos de controle  
-	glUniform4f(glGetUniformLocation(shader, "finalColor"),1.0,0.0,0.0,1.0);
-	glDrawArrays(GL_POINTS, 0, 4);	
+    // Aborta o desenho se não houver pontos ou se o VAO não existir
+    if (controlPoints.empty() || VAO_controlPoints == 0) return;
 
-	//Cor dos pontos de controle  
-	glUniform4f(glGetUniformLocation(shader, "finalColor"),0.0,0.0,1.0,1.0);
-	glDrawArrays(GL_POINTS, 1, 1);
+	glBindVertexArray(VAO_controlPoints);
+	
+	// Desenha os pontos de controle  
+	glUniform4f(glGetUniformLocation(shader, "finalColor"), 1.0, 0.0, 0.0, 1.0);
+	glDrawArrays(GL_POINTS, 0, controlPoints.size());	
+
+    // Linha poligonal para conectar os pontos (opcional)
+    glUniform4f(glGetUniformLocation(shader, "finalColor"), 0.5, 0.5, 0.5, 1.0);
+    glDrawArrays(GL_LINE_STRIP, 0, controlPoints.size());
 	
 	glBindVertexArray(0);
-
 }
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (action == GLFW_PRESS)
+    {
+        // ADICIONAR (Botão Esquerdo)
+        if (button == GLFW_MOUSE_BUTTON_LEFT)
+        {
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+
+            int width, height;
+            glfwGetWindowSize(window, &width, &height);
+
+            glm::vec3 win(xpos, height - ypos, 0.0f);
+            glm::vec4 viewport(0.0f, 0.0f, (float)width, (float)height);
+            glm::vec3 worldCoord = glm::unProject(win, view, projection, viewport);
+            
+            worldCoord.z = 0.0f;
+
+            curva.controlPoints.push_back(worldCoord);
+            curva.setupCurveBuffers(); // Atualiza a GPU
+        }
+        // REMOVER (Botão Direito)
+        else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+        {
+            if (!curva.controlPoints.empty())
+            {
+                curva.controlPoints.pop_back(); // Remove o último da CPU
+                curva.setupCurveBuffers();      // Atualiza a GPU (vai deletar os antigos e recriar)
+            }
+        }
+    }
+}
+
