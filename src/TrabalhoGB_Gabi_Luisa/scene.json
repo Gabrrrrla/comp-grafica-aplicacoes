@@ -1,0 +1,184 @@
+{
+  "camera": {
+    "position": [0.0, 3.0, 12.0],
+    "yaw": -90.0,
+    "pitch": -10.0,
+    "speed": 5.0,
+    "fov": 45.0,
+    "near": 0.1,
+    "far": 200.0
+  },
+
+  "light": {
+    "position": [0.0, 10.0, 5.0],
+    "color": [1.0, 0.97, 0.90],
+    "intensity": 1.0,
+    "ambient": 0.25
+  },
+
+  "objects": [
+    {
+      "name": "Piso_Centro",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [0.0, -0.5, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [20.0, 0.5, 20.0]
+    },
+    {
+      "name": "Parede_Norte",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [0.0, 3.0, -10.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [20.0, 7.0, 0.5]
+    },
+    {
+      "name": "Parede_Sul",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [0.0, 3.0, 10.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [20.0, 7.0, 0.5]
+    },
+    {
+      "name": "Parede_Leste",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [10.0, 3.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.5, 7.0, 20.0]
+    },
+    {
+      "name": "Parede_Oeste",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [-10.0, 3.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.5, 7.0, 20.0]
+    },
+    {
+      "name": "Teto",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [0.0, 6.75, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [20.0, 0.5, 20.0]
+    },
+    {
+      "name": "Pedestal_Esquerda",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [-4.0, 0.75, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.2, 1.5, 1.2]
+    },
+    {
+      "name": "Pedestal_Direita",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [4.0, 0.75, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.2, 1.5, 1.2]
+    },
+    {
+      "name": "Pedestal_Fundo_Esq",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [-4.0, 0.75, -6.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.2, 1.5, 1.2]
+    },
+    {
+      "name": "Pedestal_Fundo_Dir",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [4.0, 0.75, -6.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.2, 1.5, 1.2]
+    },
+    {
+      "name": "Suzanne_Esquerda",
+      "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
+      "position": [-4.0, 2.3, 0.0],
+      "rotation": [0.0, 25.0, 0.0],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    {
+      "name": "Suzanne_Direita",
+      "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
+      "position": [4.0, 2.3, 0.0],
+      "rotation": [0.0, -25.0, 0.0],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    {
+      "name": "Suzanne_Fundo_Esq",
+      "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
+      "position": [-4.0, 2.3, -6.0],
+      "rotation": [0.0, 20.0, 0.0],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    {
+      "name": "Suzanne_Fundo_Dir",
+      "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
+      "position": [4.0, 2.3, -6.0],
+      "rotation": [0.0, -20.0, 0.0],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    {
+      "name": "Suzanne_Centro",
+      "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
+      "position": [0.0, 2.3, -6.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.2, 1.2, 1.2]
+    },
+    {
+      "name": "Bloco_Decorativo_NE",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [7.0, 0.5, -7.0],
+      "rotation": [0.0, 30.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "name": "Bloco_Decorativo_NO",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [-7.0, 0.5, -7.0],
+      "rotation": [0.0, -30.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "name": "Coluna_NE",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [8.5, 3.0, -8.5],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.8, 6.0, 0.8]
+    },
+    {
+      "name": "Coluna_NO",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [-8.5, 3.0, -8.5],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.8, 6.0, 0.8]
+    },
+    {
+      "name": "Coluna_SE",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [8.5, 3.0, 8.5],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.8, 6.0, 0.8]
+    },
+    {
+      "name": "Coluna_SO",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [-8.5, 3.0, 8.5],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.8, 6.0, 0.8]
+    },
+    {
+      "name": "Suzanne_Voadora",
+      "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
+      "position": [0.0, 4.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0],
+      "animation": {
+        "speed": 0.6,
+        "controlPoints": [
+          [ 4.0, 4.0,  4.0],
+          [ 4.0, 4.5, -4.0],
+          [-4.0, 3.5, -4.0],
+          [-4.0, 4.0,  4.0]
+        ]
+      }
+    }
+  ]
+}
