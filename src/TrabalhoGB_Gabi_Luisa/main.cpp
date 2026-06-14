@@ -1,6 +1,7 @@
 // Alunas: Gabriela Bley e Luisa Becker
 // Trabalho GB - Visualizador 3D com cena configurável
 
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <sstream>
