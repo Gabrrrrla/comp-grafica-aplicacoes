@@ -1,6 +1,5 @@
 // Alunas: Gabriela Bley e Luisa Becker
-// Processamento Grafico: Aplicacoes
-// Trabalho GB - Visualizador 3D com Cena Configuravel
+// Trabalho GB - Visualizador 3D com cena configurável
 
 #include <iostream>
 #include <fstream>
@@ -339,8 +338,14 @@ bool loadScene(const std::string& path) {
         float yaw       = json::getFloat(camObj, "yaw",   camera.yaw);
         float pitch     = json::getFloat(camObj, "pitch", camera.pitch);
         float speed     = json::getFloat(camObj, "speed", camera.movementSpeed);
+        float fov       = json::getFloat(camObj, "fov",   camera.fov);
+        float nearP     = json::getFloat(camObj, "near",  camera.nearPlane);
+        float farP      = json::getFloat(camObj, "far",   camera.farPlane);
         camera = Camera(pos, glm::vec3(0.0f, 1.0f, 0.0f), yaw, pitch);
         camera.movementSpeed = speed;
+        camera.fov       = fov;
+        camera.nearPlane = nearP;
+        camera.farPlane  = farP;
     }
 
     // Objetos
@@ -464,9 +469,9 @@ int main() {
         glm::mat4 view = camera.getViewMatrix();
         glm::mat4 projection;
         if (perspectiveProjection) {
-            projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 200.0f);
+            projection = glm::perspective(glm::radians(camera.fov), aspect, camera.nearPlane, camera.farPlane);
         } else {
-            projection = glm::ortho(-8.0f * aspect, 8.0f * aspect, -8.0f, 8.0f, 0.1f, 200.0f);
+            projection = glm::ortho(-8.0f * aspect, 8.0f * aspect, -8.0f, 8.0f, camera.nearPlane, camera.farPlane);
         }
 
         glUseProgram(shaderID);

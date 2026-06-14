@@ -5,7 +5,7 @@
 Camera::Camera(glm::vec3 startPos, glm::vec3 startUp, float startYaw,
                float startPitch)
     : front(glm::vec3(0.0, 0.0, 1.0)), movementSpeed(2.5f),
-      mouseSensitivity(0.1f) {
+      mouseSensitivity(0.1f), fov(45.0f), nearPlane(0.1f), farPlane(200.0f) {
   position = startPos;
   worldUp = startUp;
   yaw = startYaw;

@@ -23,6 +23,11 @@ public:
     float movementSpeed;
     float mouseSensitivity;
 
+    // Parâmetros do frustum (lidos do scene.json)
+    float fov;
+    float nearPlane;
+    float farPlane;
+
     // Construtor com valores padrão (apontando para a origem)
     Camera(glm::vec3 startPos = glm::vec3(0.0f, 0.0f, -3.0f), 
            glm::vec3 startUp = glm::vec3(0.0f, 1.0f, 0.0f), 

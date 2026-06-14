@@ -2,26 +2,64 @@
 
 **Alunas:** Gabriela Bley e Luisa Becker  
 **Disciplina:** Processamento Gráfico: Aplicações — Unisinos  
-**Professor:** Rossana Queiroz
+**Professora:** Rossana Queiroz
 
 ---
 
 ## Descrição
 
-Visualizador de cena 3D navegável implementado em OpenGL. A cena é um **museu virtual** com 22 objetos distribuídos em um salão com paredes, colunas, pedestais e esculturas. Uma das esculturas (Suzanne) voa pelo salão seguindo uma curva paramétrica Catmull-Rom.
+Visualizador de cena 3D navegável implementado em OpenGL. A cena é um **museu virtual** com 23 objetos distribuídos em um salão com paredes, colunas, pedestais e esculturas. Dois objetos se movem automaticamente: uma escultura (Suzanne) voa pelo salão em altura média, e um cubo orbita o centro do salão rente ao chão — ambos seguindo curvas paramétricas Catmull-Rom.
 
-A cena é carregada a partir de um arquivo `scene.json`, que define os objetos, a câmera, a fonte de luz e as animações.
+A cena é carregada inteiramente a partir do arquivo `scene.json`, que define os objetos, câmera, fonte de luz, frustum e animações.
 
 ---
 
-## Requisitos implementados
+## Como compilar e executar
 
-- **Leitura de múltiplos OBJs** com grupos de malha (mesh), materiais `.mtl` e texturas
-- **Iluminação de Phong** com ka, kd, ks e shininess lidos do `.mtl`; intensidades configuráveis no `scene.json`
-- **Controle de câmera** por teclado (WASD) e mouse (FPS)
-- **Seleção de objetos** via TAB com destaque visual; translação, rotação e escala uniformes pelo teclado
-- **Animação por curva Catmull-Rom** fechada — o objeto `Suzanne_Voadora` percorre pontos de controle em loop contínuo
-- **Arquivo de configuração de cena** (`scene.json`) com objetos, transformações iniciais, animações, luz e câmera
+### Pré-requisitos
+
+- [CMake](https://cmake.org/download/) 3.10 ou superior
+- Compilador C++17 (MSVC via Visual Studio, MinGW-w64 ou similar)
+- Git (necessário para o CMake baixar as dependências automaticamente)
+
+### Passo a passo (Windows)
+
+Abra o terminal (PowerShell, Prompt de Comando ou terminal do VS Code) **na raiz do repositório** (`comp-grafica-aplicacoes/`):
+
+```bat
+mkdir build
+cd build
+cmake ..
+cmake --build . --target TrabalhoGB_Gabi_Luisa
+```
+
+Na primeira vez o CMake baixa e compila GLFW, GLM, stb_image e Assimp — isso pode levar alguns minutos.
+
+### Executar
+
+Ainda dentro da pasta `build/`, rode:
+
+```bat
+# Debug (padrão do MSVC)
+.\Debug\TrabalhoGB_Gabi_Luisa.exe
+
+# Release
+cmake --build . --target TrabalhoGB_Gabi_Luisa --config Release
+.\Release\TrabalhoGB_Gabi_Luisa.exe
+```
+
+> O programa procura o `scene.json` automaticamente nos caminhos abaixo, nessa ordem:
+> 1. `scene.json` (diretório atual)
+> 2. `../src/TrabalhoGB_Gabi_Luisa/scene.json`
+> 3. `src/TrabalhoGB_Gabi_Luisa/scene.json`
+
+### Com Visual Studio (alternativa)
+
+```bat
+cmake .. -G "Visual Studio 17 2022"
+```
+
+Abra o `.sln` gerado em `build/`, defina `TrabalhoGB_Gabi_Luisa` como projeto de inicialização e pressione **F5**.
 
 ---
 
@@ -31,16 +69,27 @@ A cena é carregada a partir de um arquivo `scene.json`, que define os objetos, 
 |---|---|
 | `W` `A` `S` `D` | Mover câmera |
 | Mouse | Girar câmera (modo FPS) |
-| `TAB` | Selecionar próximo objeto |
-| `↑` `↓` `←` `→` | Transladar objeto (Y e X) |
-| `I` / `K` | Transladar objeto (Z) |
-| `R` + `X` / `Y` / `Z` | Rotacionar objeto no eixo escolhido |
-| `+` / `-` | Escala uniforme do objeto |
+| `TAB` | Selecionar próximo objeto (nome exibido no terminal) |
+| `↑` `↓` `←` `→` | Transladar objeto selecionado (eixos Y e X) |
+| `I` / `K` | Transladar objeto selecionado (eixo Z) |
+| `R` + `X` / `Y` / `Z` | Rotacionar objeto selecionado no eixo escolhido |
+| `+` / `-` | Escala uniforme do objeto selecionado |
 | `P` | Alternar projeção perspectiva / ortográfica |
-| `M` | Alternar wireframe |
+| `M` | Alternar modo wireframe |
 | `ESC` | Sair |
 
-> Objetos com animação ativa não respondem aos controles de translação.
+> Objetos com animação ativa (`Suzanne_Voadora`, `Bloco_Orbital`) não respondem aos controles de translação.
+
+---
+
+## Requisitos implementados
+
+- **Leitura de múltiplos OBJs** já triangularizados, com normais e UVs; suporte a grupos de malha (`g`) e materiais `.mtl` por grupo
+- **Iluminação de Phong** com ka, kd, ks e shininess lidos do `.mtl`; intensidade da luz e ambient configuráveis no `scene.json`
+- **Controle de câmera FPS** por teclado (WASD) e mouse
+- **Seleção de objetos** via TAB com destaque visual dourado; translação (6 direções), rotação (3 eixos) e escala uniforme pelo teclado
+- **Animação por curva Catmull-Rom** em dois objetos: `Suzanne_Voadora` (altura média) e `Bloco_Orbital` (rente ao chão)
+- **Configuração completa por `scene.json`**: objetos, transformações iniciais, animações, fonte de luz, posição/orientação da câmera e definição do frustum (fov, near, far)
 
 ---
 
@@ -48,17 +97,15 @@ A cena é carregada a partir de um arquivo `scene.json`, que define os objetos, 
 
 ```
 TrabalhoGB_Gabi_Luisa/
-├── main.cpp        # Loop principal, shaders, parser de cena, curva Catmull-Rom
+├── main.cpp        # Loop principal, shaders embutidos, parser JSON, curva Catmull-Rom
 ├── Model.h / .cpp  # Carregamento de OBJ/MTL/texturas, renderização por mesh
-├── Camera.h / .cpp # Câmera FPS com WASD e mouse
-└── scene.json      # Configuração da cena (objetos, luz, câmera, animações)
+├── Camera.h / .cpp # Câmera FPS com WASD, mouse, fov/near/far configuráveis
+└── scene.json      # Configuração completa da cena
 ```
 
 ---
 
 ## Arquivo de cena (`scene.json`)
-
-O arquivo define três seções principais:
 
 ### `camera`
 ```json
@@ -66,7 +113,10 @@ O arquivo define três seções principais:
   "position": [0.0, 3.0, 12.0],
   "yaw": -90.0,
   "pitch": -10.0,
-  "speed": 5.0
+  "speed": 5.0,
+  "fov": 45.0,
+  "near": 0.1,
+  "far": 200.0
 }
 ```
 
@@ -81,8 +131,9 @@ O arquivo define três seções principais:
 ```
 
 ### `objects`
-Cada objeto pode ter:
-- `file` — caminho do `.obj`
+Cada objeto suporta:
+- `name` — identificador exibido ao selecionar
+- `file` — caminho do `.obj` (relativo à raiz do repositório)
 - `position`, `rotation`, `scale` — transformação inicial
 - `animation` *(opcional)* — curva Catmull-Rom com `controlPoints` e `speed`
 
@@ -92,7 +143,7 @@ Cada objeto pode ter:
   "file": "../assets/Modelos3D/SuzanneSubdiv1.obj",
   "position": [0.0, 4.0, 0.0],
   "rotation": [0.0, 0.0, 0.0],
-  "scale": [1.0, 1.0, 1.0],
+  "scale":    [1.0, 1.0, 1.0],
   "animation": {
     "speed": 0.6,
     "controlPoints": [
@@ -107,32 +158,12 @@ Cada objeto pode ter:
 
 ---
 
-## Como compilar e executar
-
-O projeto usa CMake e está integrado ao workspace da disciplina.
-
-```bash
-# Na raiz do repositório (comp-grafica-aplicacoes/)
-mkdir build && cd build
-cmake ..
-cmake --build . --target TrabalhoGB_Gabi_Luisa
-
-# Executar (de dentro de build/)
-./TrabalhoGB_Gabi_Luisa
-```
-
-O `scene.json` é procurado automaticamente nos seguintes caminhos (relativo ao executável):
-1. `scene.json` (diretório atual)
-2. `../src/TrabalhoGB_Gabi_Luisa/scene.json`
-3. `src/TrabalhoGB_Gabi_Luisa/scene.json`
-
----
-
 ## Dependências
 
-Gerenciadas automaticamente pelo CMake via FetchContent:
+Baixadas e compiladas automaticamente pelo CMake via FetchContent — não é necessário instalar nada manualmente:
 
 - [GLFW](https://www.glfw.org/) 3.4
 - [GLM](https://github.com/g-truc/glm) 1.0.1
 - [stb_image](https://github.com/nothings/stb)
+- [Assimp](https://github.com/assimp/assimp) 5.3.1
 - GLAD (incluído no repositório em `include/glad/` e `common/`)

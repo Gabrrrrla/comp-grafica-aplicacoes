@@ -179,6 +179,22 @@
           [-4.0, 4.0,  4.0]
         ]
       }
+    },
+    {
+      "name": "Bloco_Orbital",
+      "file": "../assets/Modelos3D/Cube.obj",
+      "position": [6.0, 1.5, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.5, 0.5, 0.5],
+      "animation": {
+        "speed": 0.4,
+        "controlPoints": [
+          [ 6.0, 1.5,  0.0],
+          [ 0.0, 1.5,  6.0],
+          [-6.0, 1.5,  0.0],
+          [ 0.0, 1.5, -6.0]
+        ]
+      }
     }
   ]
 }
