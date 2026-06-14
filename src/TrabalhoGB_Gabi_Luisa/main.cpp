@@ -1,6 +1,7 @@
 // Alunas: Gabriela Bley e Luisa Becker
 // Trabalho GB - Visualizador 3D com cena configurável
 
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -146,6 +147,12 @@ struct SceneObject {
     Transform3D transform;
     AnimationCurve curve;
     std::string name;
+
+    SceneObject() = default;
+    SceneObject(SceneObject&&) = default;
+    SceneObject& operator=(SceneObject&&) = default;
+    SceneObject(const SceneObject&) = delete;
+    SceneObject& operator=(const SceneObject&) = delete;
 };
 
 // ---------- Globals ----------

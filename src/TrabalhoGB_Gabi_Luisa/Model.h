@@ -64,6 +64,9 @@ public:
     Model(const Model&) = delete;
     Model& operator=(const Model&) = delete;
 
+    Model(Model&& other) noexcept;
+    Model& operator=(Model&& other) noexcept;
+
     bool loadFromFile(const std::string& path);
     void draw(GLuint shaderID, const Transform3D& transform, bool selected = false) const;
     bool isLoaded() const;

@@ -285,6 +285,26 @@ Model::~Model() {
     clear();
 }
 
+Model::Model(Model&& other) noexcept
+    : meshes(std::move(other.meshes)),
+      materials(std::move(other.materials)),
+      directory(std::move(other.directory)),
+      loaded(other.loaded) {
+    other.loaded = false;
+}
+
+Model& Model::operator=(Model&& other) noexcept {
+    if (this != &other) {
+        clear();
+        meshes    = std::move(other.meshes);
+        materials = std::move(other.materials);
+        directory = std::move(other.directory);
+        loaded    = other.loaded;
+        other.loaded = false;
+    }
+    return *this;
+}
+
 bool Model::loadFromFile(const std::string& path) {
     clear();
 
