@@ -75,6 +75,7 @@ std::string resolveAssetPath(const std::string& path) {
         "../assets/Modelos3D/" + fileName,
         "assets/Modelos3D/" + fileName,
         "../../assets/Modelos3D/" + fileName,
+        "../../../assets/Modelos3D/" + fileName,
         "src/TrabalhoGB_Gabi_Luisa/" + fileName,
         "../src/TrabalhoGB_Gabi_Luisa/" + fileName,
     };

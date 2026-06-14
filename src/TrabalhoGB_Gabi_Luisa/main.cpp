@@ -429,7 +429,12 @@ int main() {
 
     // Tenta carregar de varias localizacoes
     bool loaded = false;
-    for (const std::string& p : {"scene.json", "../src/TrabalhoGB_Gabi_Luisa/scene.json", "src/TrabalhoGB_Gabi_Luisa/scene.json"}) {
+    for (const std::string& p : {
+            "scene.json",
+            "../src/TrabalhoGB_Gabi_Luisa/scene.json",
+            "src/TrabalhoGB_Gabi_Luisa/scene.json",
+            "../../src/TrabalhoGB_Gabi_Luisa/scene.json"
+        }) {
         if (loadScene(p)) { loaded = true; break; }
     }
     if (!loaded) {
